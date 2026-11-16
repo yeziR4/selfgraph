@@ -110,15 +110,16 @@ export function chunkText(text: string, options: { max_tokens?: number; overlap_
   const step = maxTokens - overlapTokens;
   const chunks: Chunk[] = [];
   let index = 0;
+  let start = 0;
   const n = tokens.length;
   for (let i = 0; i < n; i += step) {
     const piece = encoder.decode(tokens.slice(i, i + maxTokens));
-    const start = cpLen(encoder.decode(tokens.slice(0, i)));
     if (pyStrip(piece)) {
       chunks.push({ index, text: piece, start_offset: start, end_offset: start + cpLen(piece) });
       index++;
     }
     if (i + maxTokens >= n) break;
+    start += cpLen(encoder.decode(tokens.slice(i, i + step)));
   }
   return chunks;
 }

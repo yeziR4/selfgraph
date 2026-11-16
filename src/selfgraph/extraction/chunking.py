@@ -99,15 +99,16 @@ def chunk_text(text: str, *, max_tokens: int = 512, overlap_tokens: int | None =
     chunks: list[Chunk] = []
     index = 0
     i = 0
+    start = 0
     n = len(tokens)
     while i < n:
         piece = enc.decode(tokens[i : i + max_tokens])
-        start = len(enc.decode(tokens[:i]))
         if piece.strip():
             chunks.append(Chunk(index=index, text=piece, start_offset=start, end_offset=start + len(piece)))
             index += 1
         if i + max_tokens >= n:
             break
+        start += len(enc.decode(tokens[i : i + step]))
         i += step
     return chunks
 
