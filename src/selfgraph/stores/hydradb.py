@@ -438,22 +438,26 @@ class HydraDBStore(AutoCommitStore):
                     held.append((keys, params))
         index_rows = _key_rows(ns, rows) if label == L_ENTITY else []
         await self._merge_rows(_KEY, index_rows)
-        await self._merge_rows(label, out, [r["id"] for r in index_rows])
+        await self._merge_rows(label, out, [r["id"] for r in index_rows], extra_label=extra_label)
         for keys, params in held:
             await self._run(f"MATCH (n:{label}) WHERE n.id IN $iids REMOVE {_removes('n', keys)}", params)
 
-    async def _merge_rows(self, label: str, rows: list[dict], needs: list[int] | None = None) -> None:
+    async def _merge_rows(
+        self, label: str, rows: list[dict], needs: list[int] | None = None, *, extra_label: str | None = None
+    ) -> None:
         """Upsert node rows by surrogate id with one UNWIND statement per batch of rows sharing a column set.
 
         @param label (str): the node label.
         @param rows (list[dict]): the rows, each with its surrogate id and the columns to set.
         @param needs (list[int] | None): ids that must be written first, such as the entities' key rows, so a
             failed write never leaves an entity stored without them.
+        @param extra_label (str | None): optional secondary node label (e.g., entity type) to attach on upsert.
         @return (None): nothing.
         """
+        labels = f"n:{label}" if not extra_label or extra_label == label else f"n:{label}, n:{quote_label(extra_label)}"
         for batch in _by_columns(rows):
             await self._write(
-                f"UNWIND $rows AS row MERGE (n {{id: row.id}}) SET n:{label}, {_sets('n', batch[0], ('id',))}",
+                f"UNWIND $rows AS row MERGE (n {{id: row.id}}) SET {labels}, {_sets('n', batch[0], ('id',))}",
                 {"rows": batch},
                 [r["id"] for r in batch],
                 needs or (),

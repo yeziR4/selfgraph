@@ -596,6 +596,7 @@ export class HydraDBStore extends AutoCommitStore implements GraphStore {
       label,
       out,
       indexRows.map((r) => r.id as bigint),
+      options.extra_label,
     );
     for (const [keys, params] of held) {
       await this._run(`MATCH (n:${label}) WHERE n.id IN $iids REMOVE ${removes("n", keys)}`, params);
@@ -608,12 +609,20 @@ export class HydraDBStore extends AutoCommitStore implements GraphStore {
    * @param label (string): the node label.
    * @param rows (Props[]): the rows, each with its surrogate id and the columns to set.
    * @param needs (readonly bigint[]): ids that must be written first, such as the entities' key rows, so a failed write never leaves an entity stored without them.
+   * @param extraLabel (string | null | undefined): optional secondary node label to attach on upsert.
    * @return (void): nothing.
    */
-  private async mergeRows(label: string, rows: Props[], needs: readonly bigint[] = []): Promise<void> {
+  private async mergeRows(
+    label: string,
+    rows: Props[],
+    needs: readonly bigint[] = [],
+    extraLabel?: string | null,
+  ): Promise<void> {
+    const labels =
+      extraLabel && extraLabel !== label ? `n:${label}, n:${quoteLabel(extraLabel)}` : `n:${label}`;
     for (const batch of byColumns(rows)) {
       await this.write(
-        `UNWIND $rows AS row MERGE (n {id: row.id}) SET n:${label}, ${sets("n", batch[0]!, ["id"])}`,
+        `UNWIND $rows AS row MERGE (n {id: row.id}) SET ${labels}, ${sets("n", batch[0]!, ["id"])}`,
         { rows: batch },
         batch.map((r) => r.id as bigint),
         needs,
